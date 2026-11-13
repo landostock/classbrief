@@ -11,6 +11,7 @@ Die App ist für einen einzelnen Nutzer ausgelegt und läuft als FastAPI-/Jinja-
 - Entfall, Vertretung, Verschiebung, Raum und Lehrkraft werden vor jedem Lauf erneut geprüft.
 - Alte Ordnerbestände werden nicht als aktueller Unterricht ausgegeben. Relevant sind neue oder geänderte Materialien und der bestätigte Fachstand.
 - Leere Briefings werden vermieden: Ohne neue Belege zeigt ClassBrief nur den bestätigten Stand, offene Fragen und die Unsicherheit der zeitlichen Zuordnung.
+- Bei manueller Vorbereitung stellt ClassBrief höchstens drei kurze Multiple-Choice-Rückfragen, aber nur wenn die Antwort den Unterrichtsstand wirklich klären würde. Die Fragen bleiben nach dem Schließen als Hinweis erhalten und können übersprungen werden.
 
 ## KI-Betriebsarten
 
@@ -78,6 +79,8 @@ fly deploy
 ## Automatik
 
 ClassBrief wertet die gespeicherten Regeln minütlich in der Zeitzone `Europe/Berlin` aus. Vor der KI-Arbeit wird die Zielstunde aus dem aktuellen Plan aufgelöst. Ein stabiler Marker verhindert doppelte Ausführung. Bei reinem Plugin-Betrieb können dieselben Regeln stattdessen einmalig mit geplanten ChatGPT-Aufgaben synchronisiert werden.
+
+Automatische Briefings warten grundsätzlich nicht auf Rückfragen. Sie werden mit vorsichtig gekennzeichneten Annahmen erstellt. Nur ein bewusst gestartetes „Jetzt vorbereiten“ kann eine optionale Rückfrage erzeugen; offene Fragen werden serverseitig gespeichert und bei aktivierten Benachrichtigungen zusätzlich als Push gemeldet.
 
 Der geschützte Endpoint `/internal/tick` bleibt für externe Scheduler und Diagnose erhalten.
 

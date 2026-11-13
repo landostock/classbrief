@@ -9,19 +9,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import Settings
-from app.models import Briefing, PushSubscription
+from app.models import Briefing, BriefingClarification, PushSubscription
 
 logger = logging.getLogger("classbrief.push")
 
 
-async def send_briefing_push(db: Session, briefing: Briefing, settings: Settings, new_materials: int = 0) -> int:
+async def _send_push(db: Session, settings: Settings, payload: dict) -> int:
     if not settings.vapid_private_key or not settings.vapid_public_key:
         return 0
-    payload = json.dumps({
-        "title": f"{briefing.subject.name} in {briefing.subject.preparation_minutes} Minuten",
-        "body": f"{new_materials} neue Materialien wurden ausgewertet." if new_materials else "Dein Unterrichtsbriefing ist fertig.",
-        "url": f"/briefings/{briefing.id}",
-    }, ensure_ascii=False)
+    encoded = json.dumps(payload, ensure_ascii=False)
     sent = 0
     for subscription in list(db.scalars(select(PushSubscription))):
         info = {"endpoint": subscription.endpoint, "keys": {"p256dh": subscription.p256dh, "auth": subscription.auth}}
@@ -29,7 +25,7 @@ async def send_briefing_push(db: Session, briefing: Briefing, settings: Settings
             await asyncio.to_thread(
                 webpush,
                 subscription_info=info,
-                data=payload,
+                data=encoded,
                 vapid_private_key=settings.vapid_private_key,
                 vapid_claims={"sub": f"mailto:noreply@{settings.app_base_url.split('://')[-1].split('/')[0]}"},
             )
@@ -41,3 +37,19 @@ async def send_briefing_push(db: Session, briefing: Briefing, settings: Settings
                 db.commit()
             logger.warning("push.failed")
     return sent
+
+
+async def send_briefing_push(db: Session, briefing: Briefing, settings: Settings, new_materials: int = 0) -> int:
+    return await _send_push(db, settings, {
+        "title": f"{briefing.subject.name} in {briefing.subject.preparation_minutes} Minuten",
+        "body": f"{new_materials} neue Materialien wurden ausgewertet." if new_materials else "Dein Unterrichtsbriefing ist fertig.",
+        "url": f"/briefings/{briefing.id}",
+    })
+
+
+async def send_clarification_push(db: Session, clarification: BriefingClarification, settings: Settings) -> int:
+    return await _send_push(db, settings, {
+        "title": f"Eine kurze Frage zu {clarification.subject.name}",
+        "body": "Deine Antwort macht das Briefing genauer. Du kannst sie auch überspringen.",
+        "url": f"/?clarification={clarification.id}",
+    })

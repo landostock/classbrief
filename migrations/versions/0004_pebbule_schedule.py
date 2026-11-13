@@ -15,10 +15,16 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column("lessons", sa.Column("room", sa.String(length=120), nullable=True))
-    op.add_column("lessons", sa.Column("teacher", sa.String(length=120), nullable=True))
-    op.add_column("lessons", sa.Column("change_kind", sa.String(length=32), nullable=True))
-    op.add_column("lessons", sa.Column("note", sa.String(length=500), nullable=True))
+    existing = {column["name"] for column in sa.inspect(op.get_bind()).get_columns("lessons")}
+    additions = {
+        "room": sa.Column("room", sa.String(length=120), nullable=True),
+        "teacher": sa.Column("teacher", sa.String(length=120), nullable=True),
+        "change_kind": sa.Column("change_kind", sa.String(length=32), nullable=True),
+        "note": sa.Column("note", sa.String(length=500), nullable=True),
+    }
+    for name, column in additions.items():
+        if name not in existing:
+            op.add_column("lessons", column)
 
 
 def downgrade():

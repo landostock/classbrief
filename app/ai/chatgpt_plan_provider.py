@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.ai.base import AIProvider, AIResult
 from app.ai.openai_provider import AIProviderError
-from app.ai.prompts import BRIEFING_INSTRUCTIONS, MATERIAL_INSTRUCTIONS, MEMORY_INSTRUCTIONS
-from app.ai.schemas import LessonBriefingSchema, MaterialAnalysisSchema, MaterialBatchSchema, SubjectMemorySchema
+from app.ai.prompts import BRIEFING_INSTRUCTIONS, CLARIFICATION_INSTRUCTIONS, MATERIAL_INSTRUCTIONS, MEMORY_INSTRUCTIONS
+from app.ai.schemas import ClarificationSet, LessonBriefingSchema, MaterialAnalysisSchema, MaterialBatchSchema, SubjectMemorySchema
 from app.config import Settings
 from app.models import ChatGPTConnection
 from app.services.chatgpt_plan import ChatGPTPlanError, access_token
@@ -134,8 +134,12 @@ class ChatGPTPlanProvider(AIProvider):
             content=content,
         )
 
-    async def create_lesson_briefing(self, subject: str, memory: dict, analyses: list[dict], deep: bool = False) -> AIResult:
+    async def create_clarifications(self, subject: str, memory: dict, analyses: list[dict]) -> AIResult:
         content = json.dumps({"fach": subject, "fachgedaechtnis": memory, "materialanalysen": analyses}, ensure_ascii=False)
+        return await self._structured(schema=ClarificationSet, name="briefing_clarifications", instructions=CLARIFICATION_INSTRUCTIONS, content=content)
+
+    async def create_lesson_briefing(self, subject: str, memory: dict, analyses: list[dict], deep: bool = False, clarifications: list[dict] | None = None) -> AIResult:
+        content = json.dumps({"fach": subject, "fachgedaechtnis": memory, "materialanalysen": analyses, "bestaetigte_rueckfragen": clarifications or []}, ensure_ascii=False)
         return await self._structured(schema=LessonBriefingSchema, name="lesson_briefing", instructions=BRIEFING_INSTRUCTIONS, content=content)
 
     async def update_subject_memory(self, current: dict, briefing: dict, confirmed_at: str) -> AIResult:

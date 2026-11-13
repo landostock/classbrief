@@ -7,8 +7,8 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from app.ai.base import AIProvider, AIResult
-from app.ai.prompts import BRIEFING_INSTRUCTIONS, MATERIAL_INSTRUCTIONS, MEMORY_INSTRUCTIONS
-from app.ai.schemas import LessonBriefingSchema, MaterialAnalysisSchema, MaterialBatchSchema, SubjectMemorySchema
+from app.ai.prompts import BRIEFING_INSTRUCTIONS, CLARIFICATION_INSTRUCTIONS, MATERIAL_INSTRUCTIONS, MEMORY_INSTRUCTIONS
+from app.ai.schemas import ClarificationSet, LessonBriefingSchema, MaterialAnalysisSchema, MaterialBatchSchema, SubjectMemorySchema
 from app.config import Settings
 
 SchemaT = TypeVar("SchemaT", bound=BaseModel)
@@ -79,9 +79,13 @@ class OpenAIProvider(AIProvider):
             model=self.settings.openai_model,
         )
 
-    async def create_lesson_briefing(self, subject: str, memory: dict, analyses: list[dict], deep: bool = False) -> AIResult:
-        model = self.settings.openai_reasoning_model if deep and self.settings.openai_reasoning_model else self.settings.openai_model
+    async def create_clarifications(self, subject: str, memory: dict, analyses: list[dict]) -> AIResult:
         content = json.dumps({"fach": subject, "fachgedaechtnis": memory, "materialanalysen": analyses}, ensure_ascii=False)
+        return await self._structured(schema=ClarificationSet, name="briefing_clarifications", instructions=CLARIFICATION_INSTRUCTIONS, content=content, model=self.settings.openai_model)
+
+    async def create_lesson_briefing(self, subject: str, memory: dict, analyses: list[dict], deep: bool = False, clarifications: list[dict] | None = None) -> AIResult:
+        model = self.settings.openai_reasoning_model if deep and self.settings.openai_reasoning_model else self.settings.openai_model
+        content = json.dumps({"fach": subject, "fachgedaechtnis": memory, "materialanalysen": analyses, "bestaetigte_rueckfragen": clarifications or []}, ensure_ascii=False)
         return await self._structured(schema=LessonBriefingSchema, name="lesson_briefing", instructions=BRIEFING_INSTRUCTIONS, content=content, model=model)
 
     async def update_subject_memory(self, current: dict, briefing: dict, confirmed_at: str) -> AIResult:

@@ -15,10 +15,12 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column(
-        "subjects",
-        sa.Column("briefing_enabled", sa.Boolean(), nullable=False, server_default=sa.true()),
-    )
+    existing = {column["name"] for column in sa.inspect(op.get_bind()).get_columns("subjects")}
+    if "briefing_enabled" not in existing:
+        op.add_column(
+            "subjects",
+            sa.Column("briefing_enabled", sa.Boolean(), nullable=False, server_default=sa.true()),
+        )
     # Sport remains a visible timetable subject, but never creates a briefing.
     op.execute(
         "UPDATE subjects SET enabled = 1, briefing_enabled = 0 "

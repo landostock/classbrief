@@ -1,5 +1,5 @@
-const CACHE = 'classbrief-shell-v5';
-const SHELL = ['/static/app.css?v=8', '/static/app.js?v=9', '/static/icons/icon.svg', '/static/icons/maskable.svg', '/manifest.webmanifest', '/offline'];
+const CACHE = 'classbrief-shell-v6';
+const SHELL = ['/static/app.css?v=9', '/static/app.js?v=10', '/static/icons/icon.svg', '/static/icons/maskable.svg', '/manifest.webmanifest', '/offline'];
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL))));
 self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))));
 self.addEventListener('fetch', event => {
@@ -16,6 +16,9 @@ self.addEventListener('fetch', event => {
 });
 self.addEventListener('push', event => {
   const data = event.data ? event.data.json() : {title: 'ClassBrief', body: 'Dein Briefing ist fertig.', url: '/'};
-  event.waitUntil(self.registration.showNotification(data.title, {body: data.body, icon: '/static/icons/icon.svg', data: {url: data.url || '/'}}));
+  event.waitUntil(clients.matchAll({type: 'window', includeUncontrolled: true}).then(windows => {
+    if (windows.some(windowClient => windowClient.visibilityState === 'visible')) return;
+    return self.registration.showNotification(data.title, {body: data.body, icon: '/static/icons/icon.svg', data: {url: data.url || '/'}});
+  }));
 });
 self.addEventListener('notificationclick', event => { event.notification.close(); event.waitUntil(clients.openWindow(event.notification.data.url)); });

@@ -16,8 +16,9 @@ from app.ai.provider_factory import build_ai_provider
 from app.config import Settings
 from app.extractors import extract_document
 from app.extractors.base import UnsupportedDocumentError
-from app.models import Briefing, FileRecord, Lesson, MaterialAnalysis, ProcessingRun, Setting, Subject, SubjectMemory
+from app.models import Briefing, BriefingClarification, FileRecord, Lesson, MaterialAnalysis, ProcessingRun, Setting, Subject, SubjectMemory
 from app.services.cost_tracker import automatic_budget_available, record_usage
+from app.services.notifications import send_clarification_push
 from app.services.schedule import previous_lesson
 from app.services.webdav import WebDAVClient, WebDAVDownloadTooLarge, WebDAVError, WebDAVItem
 
@@ -45,8 +46,8 @@ def _unchanged(record: FileRecord, item: WebDAVItem) -> bool:
     return _aware(record.last_modified) == _aware(item.last_modified) and record.content_length == item.content_length
 
 
-def _state_hash(subject_id: str, lesson_id: int, shas: list[str], memory_version: int) -> str:
-    raw = json.dumps([subject_id, lesson_id, sorted(shas), memory_version], separators=(",", ":"))
+def _state_hash(subject_id: str, lesson_id: int, shas: list[str], memory_version: int, clarifications: list[dict] | None = None) -> str:
+    raw = json.dumps([subject_id, lesson_id, sorted(shas), memory_version, clarifications or []], sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
@@ -220,31 +221,147 @@ async def _scan_subject(db: Session, subject: Subject, settings: Settings, windo
     return analyzed, downloaded
 
 
-async def prepare_lesson(db: Session, lesson: Lesson, settings: Settings, trigger: str = "manual", force_budget: bool = False) -> tuple[str, Briefing]:
-    run = acquire_lock(db, lesson.subject_id, trigger, lesson.id, settings)
+async def _collect_lesson_context(db: Session, lesson: Lesson, settings: Settings, *, automatic: bool) -> dict:
     subject = db.get(Subject, lesson.subject_id)
     assert subject is not None
-    try:
-        previous = previous_lesson(db, subject.id, lesson.scheduled_start)
-        confidence = "normal" if previous else "lower"
-        scan_setting = db.get(Setting, f"last_scan:{subject.id}")
-        fallback = datetime.now(timezone.utc) - timedelta(days=7)
-        if scan_setting:
-            try:
-                fallback = datetime.fromisoformat(scan_setting.value)
-            except ValueError:
-                pass
-        window_start = previous.scheduled_end if previous else fallback
-        await _scan_subject(db, subject, settings, window_start, automatic=trigger == "automatic" and not force_budget)
+    previous = previous_lesson(db, subject.id, lesson.scheduled_start)
+    confidence = "normal" if previous else "lower"
+    scan_setting = db.get(Setting, f"last_scan:{subject.id}")
+    fallback = datetime.now(timezone.utc) - timedelta(days=7)
+    if scan_setting:
+        try:
+            fallback = datetime.fromisoformat(scan_setting.value)
+        except ValueError:
+            pass
+    window_start = previous.scheduled_end if previous else fallback
+    await _scan_subject(db, subject, settings, window_start, automatic=automatic)
+    relevant = list(db.scalars(select(FileRecord).where(
+        FileRecord.subject_id == subject.id,
+        FileRecord.sha256.is_not(None),
+        or_(FileRecord.last_modified >= window_start, FileRecord.first_seen_at >= window_start),
+    )))
+    analyses = []
+    for record in relevant:
+        analysis = db.scalar(select(MaterialAnalysis).where(MaterialAnalysis.sha256 == record.sha256))
+        if analysis:
+            analyses.append(json.loads(analysis.analysis_json))
+    memory = _memory(db, subject.id)
+    return {
+        "subject": subject,
+        "confidence": confidence,
+        "relevant": relevant,
+        "analyses": analyses,
+        "memory": memory,
+        "memory_data": json.loads(memory.memory_json or "{}"),
+    }
 
-        relevant = list(db.scalars(select(FileRecord).where(
-            FileRecord.subject_id == subject.id,
-            FileRecord.sha256.is_not(None),
-            or_(FileRecord.last_modified >= window_start, FileRecord.first_seen_at >= window_start),
-        )))
+
+def clarification_payload(item: BriefingClarification) -> dict:
+    questions = json.loads(item.questions_json or "[]")
+    return {
+        "id": item.id,
+        "lesson_id": item.lesson_id,
+        "subject": item.subject.name,
+        "questions": questions,
+        "expires_at": item.expires_at.isoformat(),
+    }
+
+
+async def prepare_clarifications(db: Session, lesson: Lesson, settings: Settings) -> dict:
+    """Inspect a manual briefing and ask only questions that can change it."""
+    now = datetime.now(timezone.utc)
+    pending = db.scalar(
+        select(BriefingClarification)
+        .where(
+            BriefingClarification.lesson_id == lesson.id,
+            BriefingClarification.status == "pending",
+            BriefingClarification.expires_at > now,
+        )
+        .order_by(BriefingClarification.created_at.desc())
+        .limit(1)
+    )
+    if pending:
+        return {"status": "questions", "clarification": clarification_payload(pending)}
+
+    run = acquire_lock(db, lesson.subject_id, "clarification", lesson.id, settings)
+    try:
+        context = await _collect_lesson_context(db, lesson, settings, automatic=False)
+        shas = sorted({record.sha256 for record in context["relevant"] if record.sha256})
+        base_hash = _state_hash(lesson.subject_id, lesson.id, shas, context["memory"].version)
+        existing = db.scalar(
+            select(Briefing).where(
+                Briefing.lesson_id == lesson.id,
+                Briefing.material_state_hash == base_hash,
+                Briefing.status == "ready",
+            )
+        )
+        if existing:
+            run.status = "cached"
+            run.completed_at = now
+            db.commit()
+            return {"status": "ready", "briefing_id": existing.id}
+
+        provider, provider_name = build_ai_provider(db, settings)
+        result = await provider.create_clarifications(
+            context["subject"].name,
+            context["memory_data"],
+            context["analyses"],
+        )
+        record_usage(
+            db,
+            model=result.model,
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+            purpose="briefing_clarifications",
+            provider=provider_name,
+        )
+        questions: list[dict] = []
+        for question in result.value.questions[:3]:
+            data = question.model_dump()
+            known = [option for option in data["options"] if option["id"] != "unknown"][:4]
+            data["options"] = [*known, {"id": "unknown", "label": "Weiß ich nicht – vorsichtig ableiten"}]
+            questions.append(data)
+        if not questions:
+            run.status = "no_questions"
+            run.completed_at = datetime.now(timezone.utc)
+            db.commit()
+            return {"status": "no_questions"}
+
+        expires_at = now + timedelta(hours=4)
+        request = BriefingClarification(
+            lesson_id=lesson.id,
+            subject_id=lesson.subject_id,
+            questions_json=json.dumps(questions, ensure_ascii=False),
+            status="pending",
+            expires_at=expires_at,
+        )
+        db.add(request)
+        run.status = "awaiting_input"
+        run.completed_at = datetime.now(timezone.utc)
+        db.commit()
+        db.refresh(request)
+        await send_clarification_push(db, request, settings)
+        return {"status": "questions", "clarification": clarification_payload(request)}
+    except Exception as exc:
+        db.rollback()
+        persisted_run = db.get(ProcessingRun, run.id)
+        if persisted_run:
+            persisted_run.status = "failed"
+            persisted_run.error_code = type(exc).__name__
+            persisted_run.completed_at = datetime.now(timezone.utc)
+            db.commit()
+        raise
+
+
+async def prepare_lesson(db: Session, lesson: Lesson, settings: Settings, trigger: str = "manual", force_budget: bool = False, clarification_answers: list[dict] | None = None) -> tuple[str, Briefing]:
+    run = acquire_lock(db, lesson.subject_id, trigger, lesson.id, settings)
+    try:
+        context = await _collect_lesson_context(db, lesson, settings, automatic=trigger == "automatic" and not force_budget)
+        subject = context["subject"]
+        relevant = context["relevant"]
         shas = sorted({record.sha256 for record in relevant if record.sha256})
-        memory = _memory(db, subject.id)
-        state_hash = _state_hash(subject.id, lesson.id, shas, memory.version)
+        memory = context["memory"]
+        state_hash = _state_hash(subject.id, lesson.id, shas, memory.version, clarification_answers)
         existing = db.scalar(select(Briefing).where(Briefing.lesson_id == lesson.id, Briefing.material_state_hash == state_hash, Briefing.status == "ready"))
         if existing:
             run.status = "cached"
@@ -252,13 +369,9 @@ async def prepare_lesson(db: Session, lesson: Lesson, settings: Settings, trigge
             db.commit()
             return "cached", existing
 
-        analyses = []
-        for record in relevant:
-            analysis = db.scalar(select(MaterialAnalysis).where(MaterialAnalysis.sha256 == record.sha256))
-            if analysis:
-                analyses.append(json.loads(analysis.analysis_json))
-        memory_data = json.loads(memory.memory_json or "{}")
-        if not analyses:
+        analyses = context["analyses"]
+        memory_data = context["memory_data"]
+        if not analyses and not clarification_answers:
             current = memory_data.get("current_unit") or "Kein neues Material"
             quick = "Seit der letzten Unterrichtseinheit wurden keine neuen auswertbaren Materialien gefunden. Nutze das Fachgedächtnis als Orientierung."
             medium = quick + (f"\n\nAktueller Themenstand: {current}." if current != "Kein neues Material" else "")
@@ -268,7 +381,7 @@ async def prepare_lesson(db: Session, lesson: Lesson, settings: Settings, trigge
             provider, provider_name = build_ai_provider(db, settings)
             if provider_name == "openai" and trigger == "automatic" and not force_budget and not automatic_budget_available(db, settings):
                 raise BudgetExceeded(subject.id)
-            result = await provider.create_lesson_briefing(subject.name, memory_data, analyses)
+            result = await provider.create_lesson_briefing(subject.name, memory_data, analyses, clarifications=clarification_answers)
             record_usage(db, model=result.model, input_tokens=result.input_tokens, output_tokens=result.output_tokens, purpose="lesson_briefing", provider=provider_name)
             briefing_data = result.value.model_dump()
         briefing = Briefing(
@@ -280,7 +393,7 @@ async def prepare_lesson(db: Session, lesson: Lesson, settings: Settings, trigge
             medium_brief=briefing_data["medium_brief"],
             deep_brief_json=json.dumps(briefing_data["deep"], ensure_ascii=False),
             status="ready",
-            confidence=confidence,
+            confidence=context["confidence"],
         )
         db.add(briefing)
         try:

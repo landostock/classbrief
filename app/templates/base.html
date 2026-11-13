@@ -8,9 +8,9 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/static/icons/maskable.svg">
-  <link rel="stylesheet" href="/static/app.css?v=8">
+  <link rel="stylesheet" href="/static/app.css?v=9">
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
-  <script src="/static/app.js?v=9" defer></script>
+  <script src="/static/app.js?v=10" defer></script>
   <title>{% block title %}ClassBrief{% endblock %}</title>
 </head>
 <body>
@@ -42,16 +42,32 @@
     <a href="/settings/general" class="{% if '/settings/' in request.url.path %}active{% endif %}">{{ icon('settings')|safe }}<span>Mehr</span></a>
   </nav>
   <div class="preparation-overlay" id="preparation-overlay" hidden>
-    <div class="preparation-sheet" role="status" aria-live="polite">
+    <div class="preparation-sheet" role="dialog" aria-modal="true" aria-labelledby="preparation-title">
       <button class="overlay-close" type="button" aria-label="Im Hintergrund weiterlaufen lassen">×</button>
-      <span class="preparation-mark">✦</span>
-      <p class="label">CLASSBRIEF ARBEITET</p>
-      <h2 id="preparation-title">Vorbereitung wird erstellt</h2>
-      <p id="preparation-status">Aktuelle Materialien werden gesucht …</p>
-      <div class="preparation-progress"><span></span></div>
-      <small>Du kannst in ClassBrief bleiben. Das fertige Briefing öffnet sich automatisch.</small>
+      <div id="preparation-progress-state" role="status" aria-live="polite">
+        <span class="preparation-mark">✦</span>
+        <p class="label">CLASSBRIEF ARBEITET</p>
+        <h2 id="preparation-title">Vorbereitung wird erstellt</h2>
+        <p id="preparation-status">Aktuelle Materialien werden gesucht …</p>
+        <div class="preparation-progress"><span></span></div>
+        <small>Du kannst in ClassBrief bleiben. Das fertige Briefing öffnet sich automatisch.</small>
+      </div>
+      <form id="clarification-state" class="clarification-state" hidden>
+        <span class="clarification-mark">?</span>
+        <p class="label">KURZE RÜCKFRAGE</p>
+        <h2 id="clarification-title">Damit es wirklich zu deiner Stunde passt</h2>
+        <p class="clarification-intro">Nur beantworten, wenn du es weißt. Sonst leitet ClassBrief vorsichtig ab.</p>
+        <div id="clarification-questions" class="clarification-questions"></div>
+        <div class="clarification-actions">
+          <button class="button secondary" type="button" id="clarification-skip">Ohne Antworten fortfahren</button>
+          <button class="button primary" type="submit">Briefing erstellen</button>
+        </div>
+      </form>
     </div>
   </div>
+  <button class="clarification-dock" id="clarification-dock" type="button" hidden>
+    <span>?</span><span><strong>ClassBrief braucht kurz dich</strong><small id="clarification-dock-subject">Rückfrage zum Briefing öffnen</small></span>
+  </button>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body>
 </html>

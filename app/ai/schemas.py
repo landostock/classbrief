@@ -53,6 +53,22 @@ class AnswerCard(StrictModel):
     certainty: Literal["confirmed", "likely", "uncertain"] = "likely"
 
 
+class ClarificationOption(StrictModel):
+    id: str
+    label: str
+
+
+class ClarificationQuestion(StrictModel):
+    id: str
+    prompt: str
+    why_it_matters: str = ""
+    options: list[ClarificationOption] = Field(min_length=2, max_length=5)
+
+
+class ClarificationSet(StrictModel):
+    questions: list[ClarificationQuestion] = Field(default_factory=list, max_length=3)
+
+
 class MaterialAnalysisSchema(StrictModel):
     title: str
     document_type: str

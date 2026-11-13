@@ -62,40 +62,168 @@ document.querySelectorAll('[data-tab]').forEach(button => button.addEventListene
 }));
 
 const preparationOverlay = document.querySelector('#preparation-overlay');
+const preparationProgressState = document.querySelector('#preparation-progress-state');
+const clarificationState = document.querySelector('#clarification-state');
+const clarificationQuestions = document.querySelector('#clarification-questions');
+const clarificationDock = document.querySelector('#clarification-dock');
+let currentClarification;
+let preparationTimers = [];
+
+const clearPreparationTimers = () => {
+  preparationTimers.forEach(window.clearTimeout);
+  preparationTimers = [];
+};
+
+const showProgress = (subject = '') => {
+  currentClarification = undefined;
+  clarificationDock.hidden = true;
+  clarificationState.hidden = true;
+  preparationProgressState.hidden = false;
+  const title = document.querySelector('#preparation-title');
+  const status = document.querySelector('#preparation-status');
+  if (title) title.textContent = subject ? `${subject} wird vorbereitet` : 'Vorbereitung wird erstellt';
+  if (status) status.textContent = 'Aktuelle Materialien werden gesucht …';
+  preparationOverlay.hidden = false;
+};
+
+const renderClarification = (item, open = true) => {
+  currentClarification = item;
+  clearPreparationTimers();
+  clarificationQuestions.replaceChildren();
+  document.querySelector('#clarification-title').textContent = `Eine kurze Frage zu ${item.subject}`;
+  item.questions.forEach((question, questionIndex) => {
+    const fieldset = document.createElement('fieldset');
+    fieldset.className = 'clarification-question';
+    const legend = document.createElement('legend');
+    legend.textContent = `${questionIndex + 1}. ${question.prompt}`;
+    fieldset.appendChild(legend);
+    if (question.why_it_matters) {
+      const reason = document.createElement('small');
+      reason.textContent = question.why_it_matters;
+      fieldset.appendChild(reason);
+    }
+    question.options.forEach(option => {
+      const label = document.createElement('label');
+      label.className = 'clarification-option';
+      const input = document.createElement('input');
+      input.type = 'radio'; input.name = question.id; input.value = option.id;
+      const text = document.createElement('span');
+      text.textContent = option.label;
+      label.append(input, text); fieldset.appendChild(label);
+    });
+    clarificationQuestions.appendChild(fieldset);
+  });
+  preparationProgressState.hidden = true;
+  clarificationState.hidden = false;
+  document.querySelector('#clarification-dock-subject').textContent = `${item.subject} · ${item.questions.length === 1 ? '1 Frage' : `${item.questions.length} Fragen`}`;
+  clarificationDock.hidden = open;
+  if (open) preparationOverlay.hidden = false;
+};
+
 preparationOverlay?.querySelector('.overlay-close')?.addEventListener('click', () => {
   preparationOverlay.hidden = true;
-  toast('Die Vorbereitung läuft weiter.');
+  if (currentClarification) {
+    clarificationDock.hidden = false;
+    toast('Die Rückfrage bleibt unten für dich geöffnet.');
+  } else {
+    toast('Die Vorbereitung läuft weiter.');
+  }
 });
+clarificationDock?.addEventListener('click', () => {
+  clarificationDock.hidden = true;
+  preparationOverlay.hidden = false;
+});
+
+const finishPreparation = async endpoint => {
+  const response = await fetch(endpoint, {method: 'POST'});
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || 'Vorbereitung fehlgeschlagen');
+  if (data.status === 'already_processing') {
+    toast('Die Vorbereitung läuft bereits.');
+    preparationOverlay.hidden = true;
+    return false;
+  }
+  window.location.href = `/briefings/${data.briefing_id}`;
+  return true;
+};
 
 document.querySelectorAll('.prepare-button').forEach(button => button.addEventListener('click', async () => {
   const original = button.innerHTML; button.disabled = true; button.textContent = 'Wird vorbereitet …';
   const status = document.querySelector('#preparation-status');
-  const title = document.querySelector('#preparation-title');
   const subject = button.closest('article')?.querySelector('h3, .grow > strong')?.textContent?.trim();
-  if (title) title.textContent = subject ? `${subject} wird vorbereitet` : 'Vorbereitung wird erstellt';
-  if (status) status.textContent = 'Aktuelle Materialien werden gesucht …';
-  if (preparationOverlay) preparationOverlay.hidden = false;
+  showProgress(subject);
   const stages = [
     [5000, 'Neue und veränderte Dateien werden eingeordnet …'],
-    [15000, 'Der letzte bestätigte Unterrichtsstand wird verknüpft …'],
-    [35000, 'Antworten auf wahrscheinliche Fragen werden formuliert …'],
-    [70000, '30 Sekunden, 2 Minuten und Details werden gestaltet …'],
+    [15000, 'Der letzte bestätigte Unterrichtsstand wird geprüft …'],
+    [35000, 'ClassBrief prüft, ob eine kurze Rückfrage helfen würde …'],
   ];
-  const timers = stages.map(([delay, message]) => window.setTimeout(() => { if (status) status.textContent = message; }, delay));
+  preparationTimers = stages.map(([delay, message]) => window.setTimeout(() => { if (status) status.textContent = message; }, delay));
   try {
-    const endpoint = button.dataset.lesson ? `/api/lessons/${button.dataset.lesson}/prepare` : `/api/subjects/${button.dataset.subject}/prepare`;
-    const response = await fetch(endpoint, {method: 'POST'});
+    const base = button.dataset.lesson ? `/api/lessons/${button.dataset.lesson}` : `/api/subjects/${button.dataset.subject}`;
+    const response = await fetch(`${base}/clarifications`, {method: 'POST'});
     const data = await response.json();
     if (!response.ok) throw new Error(data.detail || 'Vorbereitung fehlgeschlagen');
-    if (data.status === 'already_processing') { toast('Die Vorbereitung läuft bereits.'); if (preparationOverlay) preparationOverlay.hidden = true; button.disabled = false; button.innerHTML = original; return; }
-    window.location.href = `/briefings/${data.briefing_id}`;
+    if (data.status === 'questions') {
+      renderClarification(data.clarification, true);
+      toast('Eine kurze Rückfrage macht dein Briefing genauer.');
+    } else if (data.status === 'ready') {
+      window.location.href = `/briefings/${data.briefing_id}`;
+    } else if (data.status === 'already_processing') {
+      preparationOverlay.hidden = true; toast('Die Vorbereitung läuft bereits.');
+    } else {
+      clearPreparationTimers();
+      if (status) status.textContent = '30 Sekunden, 2 Minuten und Details werden gestaltet …';
+      await finishPreparation(`${base}/prepare`);
+    }
   } catch (error) {
     if (preparationOverlay) preparationOverlay.hidden = true;
-    toast(error.message); button.disabled = false; button.innerHTML = original;
+    toast(error.message);
   } finally {
-    timers.forEach(window.clearTimeout);
+    if (!currentClarification) clearPreparationTimers();
+    button.disabled = false; button.innerHTML = original;
   }
 }));
+
+const submitClarification = async skip => {
+  if (!currentClarification) return;
+  const answers = {};
+  if (!skip) {
+    for (const question of currentClarification.questions) {
+      const selected = clarificationState.querySelector(`input[name="${CSS.escape(question.id)}"]:checked`);
+      if (!selected) { toast('Bitte beantworte jede Frage oder fahre ohne Antworten fort.'); return; }
+      answers[question.id] = selected.value;
+    }
+  }
+  const id = currentClarification.id;
+  const subject = currentClarification.subject;
+  showProgress(subject);
+  document.querySelector('#preparation-status').textContent = 'Deine Antworten werden ins Briefing eingearbeitet …';
+  try {
+    const response = await fetch(`/api/clarifications/${id}/answer`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({answers, skip}),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.detail || 'Antworten konnten nicht übernommen werden.');
+    if (data.status === 'already_processing') { preparationOverlay.hidden = true; toast('Die Vorbereitung läuft bereits.'); return; }
+    window.location.href = `/briefings/${data.briefing_id}`;
+  } catch (error) {
+    toast(error.message);
+    currentClarification = undefined;
+    const pending = await fetch('/api/clarifications/pending').then(response => response.json()).catch(() => null);
+    if (pending?.status === 'questions') renderClarification(pending.clarification, true);
+  }
+};
+
+clarificationState?.addEventListener('submit', event => { event.preventDefault(); submitClarification(false); });
+document.querySelector('#clarification-skip')?.addEventListener('click', () => submitClarification(true));
+
+if (!['/login', '/access'].includes(window.location.pathname)) {
+  fetch('/api/clarifications/pending').then(response => response.json()).then(data => {
+    if (data.status !== 'questions') return;
+    const requested = new URLSearchParams(window.location.search).get('clarification');
+    renderClarification(data.clarification, requested === String(data.clarification.id));
+  }).catch(() => {});
+}
 
 document.querySelector('#partial-toggle')?.addEventListener('click', event => {
   const note = event.currentTarget.closest('form').querySelector('.partial-note');
