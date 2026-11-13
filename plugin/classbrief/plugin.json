@@ -1,0 +1,33 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "classbrief",
+  "version": "0.4.0",
+  "description": "Erstellt übersichtliche, zeitlich relevante Unterrichtsbriefings mit direkten Antwortkarten aus einer privaten ClassBrief-Instanz.",
+  "author": {
+    "name": "Lando Stock",
+    "email": "lando.stock@gmail.com"
+  },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "ClassBrief",
+        "shortDescription": "Unterricht gezielt briefen",
+        "longDescription": "Erstellt ohne Längenfrage drei übersichtliche, belegte Unterrichtsbriefings aus aktuellem Stundenplan, Fachgedächtnis und zeitlich relevanten IServ-Materialien, bereitet wahrscheinliche Rückfragen vor und synchronisiert konfigurierbare ChatGPT-Cloud-Aufgaben.",
+        "developerName": "Lando Stock",
+        "category": "Education & Research",
+        "capabilities": [
+          "Interactive"
+        ],
+        "defaultPrompt": [
+          "Brief mich für meine nächste Unterrichtsstunde.",
+          "Brief mich heute Morgen für meinen Schultag.",
+          "Richte Briefings vor ausgewählten Stunden ein."
+        ],
+        "logo": "./assets/icon.svg",
+        "composerIcon": "./assets/icon.svg",
+        "brandColor": "#1677FF",
+        "brandColorDark": "#65E0FF"
+      }
+    }
+  }
+}

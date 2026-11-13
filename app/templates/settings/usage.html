@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}KI & Kosten · ClassBrief{% endblock %}
+{% block content %}
+<header class="page-header"><div><p class="eyebrow">EINSTELLUNGEN</p><h1>KI & Kosten</h1></div></header>
+{% include "settings/_nav.html" %}
+<section class="settings-panel">
+  {% if provider == 'chatgpt_plan' %}
+  <div class="included-card">
+    <span class="included-mark">✓</span>
+    <div><p class="label">CHATGPT-ABO AKTIV</p><h2>Keine separate API-Abrechnung</h2><p>ClassBrief nutzt für direkte Vorbereitungen dein verbundenes ChatGPT-Abo. Deshalb gibt es keinen Geldzähler. Die Nutzung zählt zu deinem gemeinsamen ChatGPT-Limit und lässt sich in den ChatGPT-Einstellungen verwalten.</p><p><a href="https://chatgpt.com/#settings/usage" target="_blank" rel="noopener">ChatGPT-Nutzung verwalten ↗</a></p></div>
+  </div>
+  {% elif provider == 'plugin' %}
+  <div class="included-card">
+    <span class="included-mark">✓</span>
+    <div><p class="label">PLUGIN-MODUS AKTIV</p><h2>Keine separate API-Abrechnung</h2><p><strong>Plugin-Modus aktiv.</strong> Briefings werden in deinem normalen ChatGPT-Chat mit dem ClassBrief-Plugin erstellt. ClassBrief selbst verwendet dabei keinen kostenpflichtigen OpenAI-API-Schlüssel und führt deshalb keinen Geldzähler.</p></div>
+  </div>
+  {% else %}
+  <div class="usage-hero"><div><p class="label">DIESER MONAT</p><strong>${{ '%.4f'|format(spend) }}</strong><span>von ${{ '%.2f'|format(budget) }}</span></div><div class="budget-ring" style="--progress: {{ ([spend / budget * 100, 100]|min) if budget else 0 }}%"><span>{{ ([spend / budget * 100, 100]|min)|round|int if budget else 0 }}%</span></div></div>
+  <div class="progress"><span style="width: {{ ([spend / budget * 100, 100]|min) if budget else 0 }}%"></span></div>
+  <p class="muted">Diese Anzeige betrifft nur direkt über einen API-Schlüssel abgerechnete Aufrufe.</p>
+  {% if rows %}<div class="usage-table"><div class="table-head"><span>Zweck</span><span>Aufrufe</span><span>Tokens ein/aus</span><span>Kosten</span></div>{% for row in rows %}<div><strong>{{ row[0]|replace('_', ' ')|title }}</strong><span>{{ row[1] }}</span><span>{{ row[2] or 0 }} / {{ row[3] or 0 }}</span><span>${{ '%.4f'|format(row[4] or 0) }}</span></div>{% endfor %}</div>{% else %}<div class="empty-inline">Diesen Monat wurden noch keine API-Aufrufe erfasst.</div>{% endif %}
+  {% endif %}
+</section>
+{% endblock %}

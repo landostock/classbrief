@@ -1,0 +1,9 @@
+<nav class="settings-nav" aria-label="Einstellungen">
+  <a href="/settings/general" class="{% if request.url.path == '/settings/general' %}active{% endif %}">Allgemein</a>
+  <a href="/settings/subjects" class="{% if request.url.path == '/settings/subjects' %}active{% endif %}">Fächer</a>
+  <a href="/settings/schedule" class="{% if request.url.path == '/settings/schedule' %}active{% endif %}">Stundenplan</a>
+  <a href="/settings/automations" class="{% if request.url.path == '/settings/automations' %}active{% endif %}">Automatik</a>
+  <a href="/settings/exceptions" class="{% if request.url.path == '/settings/exceptions' %}active{% endif %}">Ausnahmen</a>
+  <a href="/settings/integrations" class="{% if request.url.path == '/settings/integrations' %}active{% endif %}">Verbindungen</a>
+  <a href="/settings/usage" class="{% if request.url.path == '/settings/usage' %}active{% endif %}">KI & Kosten</a>
+</nav>

@@ -1,0 +1,19 @@
+{
+  "apps": "./.app.json",
+  "author": {
+    "name": "App developer"
+  },
+  "description": "Unterricht gezielt aus Stundenplan und aktuellen IServ-Materialien briefen",
+  "interface": {
+    "capabilities": [],
+    "category": "Other",
+    "defaultPrompt": null,
+    "developerName": "App developer",
+    "displayName": "ClassBrief",
+    "longDescription": "Unterricht gezielt aus Stundenplan und aktuellen IServ-Materialien briefen",
+    "shortDescription": "Unterricht gezielt aus Stundenplan und aktuellen IServ-Materialien briefen"
+  },
+  "name": "dev-6af4702fab608191b78722a2426f7025",
+  "version": "1.0.2",
+  "skills": "./skills"
+}

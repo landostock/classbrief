@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Stundenplan · ClassBrief{% endblock %}
+{% block content %}
+<header class="page-header clean-head schedule-page-head">
+  <div><p class="eyebrow">ZENTRALER STUNDENPLAN</p><h1>Deine Woche</h1><p class="muted">Aktuelle Stunden, Räume, Vertretungen und Briefings an einem Ort.</p></div>
+  <a class="button secondary compact" href="/settings/schedule">Basisplan bearbeiten</a>
+</header>
+
+<nav class="week-switcher" aria-label="Woche wechseln">
+  <a href="/schedule?week={{ week_offset - 1 }}" aria-label="Vorherige Woche">←</a>
+  <div><strong>{{ week_start.strftime('%d.%m.') }} – {{ week_end.strftime('%d.%m.%Y') }}</strong><span>{% if week_offset == 0 %}Diese Woche{% elif week_offset == 1 %}Nächste Woche{% elif week_offset == -1 %}Letzte Woche{% else %}Wochenansicht{% endif %}</span></div>
+  <a href="/schedule?week={{ week_offset + 1 }}" aria-label="Nächste Woche">→</a>
+</nav>
+
+<div class="schedule-days">
+  {% for day, rows in days.items() %}
+  <section class="schedule-day {% if day == today %}is-today{% endif %}">
+    <header><div><span>{{ day.strftime('%a')|day_de }}</span><strong>{{ day.strftime('%d') }}</strong></div><h2>{{ day.strftime('%A')|day_de }}</h2>{% if day == today %}<span class="today-pill">Heute</span>{% endif %}</header>
+    {% if rows %}
+    <div class="schedule-day-lessons">
+      {% for row in rows %}
+      <article class="schedule-lesson state-{{ row.state }}">
+        <div class="schedule-lesson-time"><strong>{{ row.start.strftime('%H:%M') }}</strong><span>– {{ row.end.strftime('%H:%M') }}</span></div>
+        <span class="subject-icon bg-{{ row.lesson.subject.color_identifier }}">{{ row.lesson.subject.short_name[:2] }}</span>
+        <div class="grow"><strong>{{ row.lesson.subject.name }}</strong><span>{% if row.lesson.room %}Raum {{ row.lesson.room }}{% endif %}{% if row.lesson.teacher %} · {{ row.lesson.teacher }}{% endif %}{% if row.lesson.change_kind and row.lesson.change_kind != 'normal' %} · geändert{% endif %}</span>{% if row.briefing %}<small>{{ row.briefing.probable_topic }}</small>{% endif %}</div>
+        <div class="schedule-lesson-action">
+          {% if row.briefing %}<a href="/briefings/{{ row.briefing.id }}" aria-label="Briefing öffnen">{{ icon('check')|safe }}</a>
+          {% elif not row.lesson.subject.briefing_enabled %}<span title="Keine Vorbereitung nötig">—</span>
+          {% elif row.state != 'past' and (provider == 'chatgpt_plan' or provider == 'openai') %}<button class="mini-prepare prepare-button" data-lesson="{{ row.lesson.id }}" data-subject="{{ row.lesson.subject.id }}" aria-label="Jetzt vorbereiten">✦</button>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}<p class="schedule-empty">Keine Stunden</p>{% endif %}
+  </section>
+  {% endfor %}
+</div>
+
+<div class="schedule-legend"><span><i class="legend-ready">✓</i> Briefing bereit</span><span><i>✦</i> direkt vorbereiten</span><span><i>—</i> kein Briefing vorgesehen</span></div>
+{% endblock %}

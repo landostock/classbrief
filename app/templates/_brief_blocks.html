@@ -1,0 +1,21 @@
+{% macro render_blocks(blocks) %}
+<div class="ai-layout">
+  {% for block in blocks %}
+    {% set kind = block.type if block.type is defined else block['type'] %}
+    {% if kind == 'heading' %}
+      <h3 class="ai-heading">{{ block.text or block.title }}</h3>
+    {% elif kind == 'paragraph' %}
+      {% if block.title %}<h4>{{ block.title }}</h4>{% endif %}<p>{{ block.text }}</p>
+    {% elif kind in ['bullets', 'numbered', 'checklist'] %}
+      {% if block.title %}<h4>{{ block.title }}</h4>{% endif %}
+      {% if kind == 'numbered' %}<ol class="ai-list numbered">{% else %}<ul class="ai-list {{ 'check-list' if kind == 'checklist' else '' }}">{% endif %}
+      {% for item in block['items'] %}<li>{{ item }}</li>{% endfor %}
+      {% if kind == 'numbered' %}</ol>{% else %}</ul>{% endif %}
+    {% elif kind == 'callout' %}
+      <aside class="ai-callout tone-{{ block.tone or 'neutral' }}">{% if block.title %}<strong>{{ block.title }}</strong>{% endif %}<p>{{ block.text }}</p></aside>
+    {% elif kind == 'key_value' %}
+      {% if block.title %}<h4>{{ block.title }}</h4>{% endif %}<dl class="ai-key-values">{% for row in block.rows %}<div><dt>{{ row.label }}</dt><dd>{{ row.value }}</dd></div>{% endfor %}</dl>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endmacro %}

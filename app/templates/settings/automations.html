@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Automatik · ClassBrief{% endblock %}
+{% block content %}
+<header class="page-header"><div><p class="eyebrow">EINSTELLUNGEN</p><h1>Automatik</h1><p class="muted">Cloud-Briefings zu deinen Zeiten – auch wenn dein Computer aus ist.</p></div><button class="button primary" data-dialog-open="automation-dialog">+ Regel</button></header>
+{% include "settings/_nav.html" %}
+
+<section class="automation-hero {{ 'synced' if provider != 'plugin' or sync.in_sync else 'attention' }}">
+  <div class="automation-hero-icon">{{ icon('spark')|safe }}</div>
+  <div class="grow">
+    <p class="label">{% if provider == 'chatgpt_plan' %}CLASSBRIEF CLOUD{% else %}CHATGPT CLOUD{% endif %}</p>
+    {% if provider == 'chatgpt_plan' %}
+      <h2>Automatik ist aktiv</h2>
+      <p>ClassBrief prüft deine {{ plan.tasks|length }} {{ 'Zeitgruppe' if plan.tasks|length == 1 else 'Zeitgruppen' }} selbstständig. Dein Computer und ein geöffneter Chat werden nicht benötigt.</p>
+    {% else %}
+      <h2>{{ 'Automatik ist synchron' if sync.in_sync else 'Änderungen in ChatGPT übernehmen' }}</h2>
+      <p>{% if sync.in_sync %}{{ sync.task_count }} geplante {{ 'Aufgabe' if sync.task_count == 1 else 'Aufgaben' }} greifen auf ClassBrief zu. Dein Computer wird nicht benötigt.{% else %}Deine Regeln sind gespeichert. Lass ChatGPT die geplanten Aufgaben einmalig abgleichen.{% endif %}</p>
+    {% endif %}
+  </div>
+  {% if provider == 'chatgpt_plan' or sync.in_sync %}<span class="ready-badge">{{ icon('check')|safe }} Cloudbereit</span>{% else %}<a class="button light copy-open-button" href="https://chatgpt.com/" target="_blank" rel="noopener" data-copy="{{ sync_prompt }}">Mit ChatGPT synchronisieren</a>{% endif %}
+</section>
+
+{% if not rules %}
+<section class="settings-panel onboarding-panel">
+  <div><p class="label">SCHNELLSTART</p><h2>Deinen bewährten Plan übernehmen</h2><p class="muted">07:10 Uhr Tagesbriefing, Mo–Do 13:10 Uhr für die 7./8. Stunde sowie Fachbriefings vor Biologie, Deutsch, Mathematik und Geografie.</p></div>
+  <form method="post" action="/settings/automations/recommended/create"><button class="button primary">Empfohlene Regeln anlegen</button></form>
+</section>
+{% else %}
+<section class="section-block">
+  <div class="section-title"><div><h2>Deine Regeln</h2><p>{% if provider == 'chatgpt_plan' %}Änderungen sind sofort aktiv und werden beim nächsten passenden Zeitpunkt berücksichtigt.{% else %}Änderungen werden nach dem nächsten ChatGPT-Abgleich aktiv.{% endif %}</p></div><span>{{ plan.tasks|length }} Cloud-Zeitpunkte</span></div>
+  <div class="automation-list">
+    {% for rule in rules %}
+    <article class="automation-card {{ '' if rule.enabled else 'disabled' }}">
+      <span class="automation-type">{% if rule.rule_type == 'daily_overview' %}TAG{% elif rule.rule_type == 'fixed_slot' %}ZEIT{% else %}FACH{% endif %}</span>
+      <div class="grow"><strong>{{ rule.name }}</strong><span>{{ describe_rule(rule) }}</span>{% if rule_runs.get(rule.id) %}<small>Letzter Lauf: {{ rule_runs[rule.id].created_at.strftime('%d.%m. · %H:%M') }} · {{ {'completed':'erfolgreich','failed':'fehlgeschlagen','no_target':'keine passende Stunde','started':'läuft'}[rule_runs[rule.id].status] }}</small>{% else %}<small>Noch kein Lauf protokolliert</small>{% endif %}</div>
+      <span class="pill {{ '' if rule.enabled else 'muted-pill' }}">{{ 'Aktiv' if rule.enabled else 'Pausiert' }}</span>
+      <div class="card-actions">
+        <button class="icon-button" data-dialog-open="edit-rule-{{ rule.id }}" aria-label="{{ rule.name }} bearbeiten">✎</button>
+        <form method="post" action="/settings/automations/{{ rule.id }}/toggle"><button class="icon-button" aria-label="{{ rule.name }} {{ 'pausieren' if rule.enabled else 'aktivieren' }}">{{ 'Ⅱ' if rule.enabled else '▶' }}</button></form>
+      </div>
+    </article>
+
+    <dialog id="edit-rule-{{ rule.id }}"><form method="post" action="/settings/automations/{{ rule.id }}" class="dialog-card automation-form">
+      <div class="dialog-head"><div><p class="eyebrow">AUTOMATIK</p><h2>Regel bearbeiten</h2></div><button type="button" class="icon-button" data-dialog-close>×</button></div>
+      <div class="form-grid">
+        <label class="span-2">Name<input name="name" value="{{ rule.name }}" required></label>
+        <label class="span-2">Typ<select name="rule_type" data-rule-type><option value="daily_overview" {% if rule.rule_type == 'daily_overview' %}selected{% endif %}>Tagesbriefing</option><option value="fixed_slot" {% if rule.rule_type == 'fixed_slot' %}selected{% endif %}>Bestimmte Stunde</option><option value="subject_before" {% if rule.rule_type == 'subject_before' %}selected{% endif %}>Vor einem Fach</option></select></label>
+        <fieldset class="span-2 weekday-field"><legend>Wochentage</legend>{% for day in weekdays %}<label><input type="checkbox" name="weekdays" value="{{ loop.index0 }}" {% if loop.index0|string in rule.weekdays.split(',') %}checked{% endif %}><span>{{ day[:2] }}</span></label>{% endfor %}</fieldset>
+        <label data-field="run_time">Ausführung<input type="time" name="run_time" value="{{ rule.run_time.strftime('%H:%M') if rule.run_time else '07:10' }}"></label>
+        <label data-field="target_start_time">Zielstunde beginnt<input type="time" name="target_start_time" value="{{ rule.target_start_time.strftime('%H:%M') if rule.target_start_time else '13:45' }}"></label>
+        <label class="span-2" data-field="subject_id">Fach<select name="subject_id">{% for subject in subjects %}<option value="{{ subject.id }}" {% if rule.subject_id == subject.id %}selected{% endif %}>{{ subject.name }}</option>{% endfor %}</select></label>
+        <label class="span-2" data-field="lead_minutes">Vorlauf in Minuten<input type="number" name="lead_minutes" min="1" max="180" value="{{ rule.lead_minutes or 20 }}"></label>
+      </div>
+      <div class="dialog-actions split-actions"><button class="button danger" formmethod="post" formaction="/settings/automations/{{ rule.id }}/delete" data-confirm="Diese Automatikregel wirklich löschen?">Löschen</button><span class="grow"></span><button type="button" class="button secondary" data-dialog-close>Abbrechen</button><button class="button primary">Speichern</button></div>
+    </form></dialog>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="info-strip"><strong>So funktioniert es:</strong><span>{% if provider == 'chatgpt_plan' %}ClassBrief wacht zur eingestellten Uhrzeit selbst auf und nutzt dein verbundenes ChatGPT-Abo.{% else %}Die Uhrzeit weckt ChatGPT in der Cloud.{% endif %} Vor jedem Lauf werden Live-Stundenplan und Ausnahmen erneut geprüft. Entfallene, verschobene oder bereits vergangene Stunden erzeugen deshalb kein falsches Briefing.</span></section>
+
+<dialog id="automation-dialog"><form method="post" action="/settings/automations" class="dialog-card automation-form">
+  <div class="dialog-head"><div><p class="eyebrow">NEUE AUTOMATIK</p><h2>Briefing planen</h2></div><button type="button" class="icon-button" data-dialog-close>×</button></div>
+  <div class="form-grid">
+    <label class="span-2">Name<input name="name" value="Mein Briefing" required></label>
+    <label class="span-2">Typ<select name="rule_type" data-rule-type><option value="daily_overview">Tagesbriefing</option><option value="fixed_slot">Bestimmte Stunde</option><option value="subject_before">Vor einem Fach</option></select></label>
+    <fieldset class="span-2 weekday-field"><legend>Wochentage</legend>{% for day in weekdays %}<label><input type="checkbox" name="weekdays" value="{{ loop.index0 }}" {% if loop.index0 < 5 %}checked{% endif %}><span>{{ day[:2] }}</span></label>{% endfor %}</fieldset>
+    <label data-field="run_time">Ausführung<input type="time" name="run_time" value="07:10"></label>
+    <label data-field="target_start_time">Zielstunde beginnt<input type="time" name="target_start_time" value="13:45"></label>
+    <label class="span-2" data-field="subject_id">Fach<select name="subject_id">{% for subject in subjects %}<option value="{{ subject.id }}">{{ subject.name }}</option>{% endfor %}</select></label>
+    <label class="span-2" data-field="lead_minutes">Vorlauf in Minuten<input type="number" name="lead_minutes" min="1" max="180" value="20"></label>
+  </div>
+  <div class="dialog-actions"><button type="button" class="button secondary" data-dialog-close>Abbrechen</button><button class="button primary">Regel speichern</button></div>
+</form></dialog>
+{% endblock %}

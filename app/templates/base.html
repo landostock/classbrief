@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#07131f">
+  <meta name="description" content="Automatische Vorbereitung auf deine nächste Unterrichtsstunde">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/icons/maskable.svg">
+  <link rel="stylesheet" href="/static/app.css?v=8">
+  <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+  <script src="/static/app.js?v=9" defer></script>
+  <title>{% block title %}ClassBrief{% endblock %}</title>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="ClassBrief Startseite">
+        <span class="brand-mark">C<span>B</span></span>
+        <span>ClassBrief</span>
+      </a>
+      <nav class="side-nav" aria-label="Hauptnavigation">
+        <a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">{{ icon('home')|safe }}<span>Heute</span></a>
+        <a href="/schedule" class="nav-link {% if request.url.path == '/schedule' %}active{% endif %}">{{ icon('calendar')|safe }}<span>Stundenplan</span></a>
+        <a href="/briefings" class="nav-link {% if request.url.path == '/briefings' or request.url.path.startswith('/briefings/') %}active{% endif %}">{{ icon('history')|safe }}<span>Briefings</span></a>
+        <a href="/settings/general" class="nav-link {% if '/settings/' in request.url.path %}active{% endif %}">{{ icon('settings')|safe }}<span>Einstellungen</span></a>
+      </nav>
+      <div class="sidebar-foot">
+        <span class="privacy-dot"></span>
+        <span>Privat · nur für dich</span>
+      </div>
+    </aside>
+    <main class="main-content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+  <nav class="bottom-nav" aria-label="Mobile Navigation">
+    <a href="/" class="{% if request.url.path == '/' %}active{% endif %}">{{ icon('home')|safe }}<span>Heute</span></a>
+    <a href="/schedule" class="{% if request.url.path == '/schedule' %}active{% endif %}">{{ icon('calendar')|safe }}<span>Plan</span></a>
+    <a href="/briefings" class="{% if request.url.path == '/briefings' or request.url.path.startswith('/briefings/') %}active{% endif %}">{{ icon('history')|safe }}<span>Briefings</span></a>
+    <a href="/settings/general" class="{% if '/settings/' in request.url.path %}active{% endif %}">{{ icon('settings')|safe }}<span>Mehr</span></a>
+  </nav>
+  <div class="preparation-overlay" id="preparation-overlay" hidden>
+    <div class="preparation-sheet" role="status" aria-live="polite">
+      <button class="overlay-close" type="button" aria-label="Im Hintergrund weiterlaufen lassen">×</button>
+      <span class="preparation-mark">✦</span>
+      <p class="label">CLASSBRIEF ARBEITET</p>
+      <h2 id="preparation-title">Vorbereitung wird erstellt</h2>
+      <p id="preparation-status">Aktuelle Materialien werden gesucht …</p>
+      <div class="preparation-progress"><span></span></div>
+      <small>Du kannst in ClassBrief bleiben. Das fertige Briefing öffnet sich automatisch.</small>
+    </div>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

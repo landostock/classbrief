@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ subject.name }} · ClassBrief{% endblock %}
+{% block content %}
+<header class="page-header subject-page-head">
+  <div><a class="back-link" href="/">{{ icon('back')|safe }} Heute</a><div class="subject-line large"><span class="subject-orb bg-{{ subject.color_identifier }}">{{ subject.short_name[:2] }}</span><h1>{{ subject.name }}</h1></div></div>
+  {% if not subject.briefing_enabled %}<span class="briefing-toggle is-off">Keine Briefings</span>{% elif provider == 'plugin' %}<a class="button secondary copy-open-button" href="https://chatgpt.com/" target="_blank" rel="noopener" data-copy="Brief mich mit ClassBrief jetzt für {{ subject.name }}. Erstelle ohne Längenfrage immer 30 Sekunden, 2 Minuten und Details sowie direkt aussprechbare Antworten auf wahrscheinliche Fragen. Speichere alles in ClassBrief.">{{ icon('spark')|safe }} In ChatGPT öffnen</a>{% else %}<button class="button primary prepare-button" data-subject="{{ subject.id }}">{{ icon('spark')|safe }} Jetzt vorbereiten</button>{% endif %}
+</header>
+<div class="summary-grid">
+  <section class="panel"><p class="label">AKTUELLER THEMENSTAND</p><h2>{{ memory.current_unit or (briefings[0].probable_topic if briefings else 'Noch nicht bekannt') }}</h2><p>{{ memory.current_transition or 'Wird mit der ersten bestätigten Stunde aufgebaut.' }}</p></section>
+  <section class="panel"><p class="label">NÄCHSTE STUNDE</p>{% if next_lesson %}<h2>{{ next_lesson.scheduled_start.strftime('%A')|day_de }}, {{ next_lesson.scheduled_start.strftime('%H:%M') }}</h2><p>Vorbereitung ab {{ (next_lesson.scheduled_start.timestamp() - subject.preparation_minutes * 60)|datetime_from_timestamp('%H:%M') }} Uhr</p>{% else %}<h2>Nicht geplant</h2><p>Füge die Stunde im Wochenplan hinzu.</p>{% endif %}</section>
+</div>
+<section class="section-block"><div class="section-title"><h2>Letzte Briefings</h2></div>{% if briefings %}<div class="stack-list">{% for item in briefings %}<a href="/briefings/{{ item.id }}"><div><strong>{{ item.probable_topic }}</strong><span>{{ item.lesson.scheduled_start.strftime('%d.%m.%Y · %H:%M') }}</span></div>{{ icon('chevron')|safe }}</a>{% endfor %}</div>{% else %}<div class="empty-inline">Noch kein Briefing vorhanden.</div>{% endif %}</section>
+<section class="section-block"><div class="section-title"><h2>Letzte Materialien</h2><span>{{ files|length }} angezeigt</span></div>{% if files %}<div class="stack-list">{% for file in files %}<div class="file-item">{{ icon('file')|safe }}<div><strong>{{ file.filename }}</strong><span>{{ file.processing_status|status_de }}</span></div></div>{% endfor %}</div>{% else %}<div class="empty-inline">Noch keine Materialien erkannt.</div>{% endif %}</section>
+{% endblock %}

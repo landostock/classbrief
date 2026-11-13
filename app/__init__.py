@@ -1,0 +1,1 @@
+"""ClassBrief application package."""

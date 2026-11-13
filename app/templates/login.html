@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07131f"><link rel="icon" href="/static/icons/icon.svg"><link rel="stylesheet" href="/static/app.css">
+  <title>Anmelden · ClassBrief</title>
+</head>
+<body class="login-body">
+  <main class="login-card">
+    <div class="brand login-brand"><span class="brand-mark">C<span>B</span></span><span>ClassBrief</span></div>
+    <div>
+      <p class="eyebrow">DEIN UNTERRICHT. AUF DEN PUNKT.</p>
+      <h1>Willkommen zurück.</h1>
+      <p class="muted">Melde dich an, um dein nächstes Briefing zu sehen.</p>
+    </div>
+    {% if error %}<div class="alert danger">{{ error }}</div>{% endif %}
+    <form method="post" action="/login" class="form-stack">
+      <label>Passwort<input name="password" type="password" autocomplete="current-password" autofocus required></label>
+      <button class="button primary wide" type="submit">Anmelden <span aria-hidden="true">→</span></button>
+    </form>
+    <p class="login-foot">Passwort und Zugangsdaten bleiben auf deinem Server.</p>
+  </main>
+</body>
+</html>

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Heute · ClassBrief{% endblock %}
+{% block content %}
+<header class="page-header dashboard-head clean-head">
+  <div>
+    <p class="eyebrow">{{ now.strftime('%A')|day_de }}, {{ now.strftime('%d. %B')|month_de }}</p>
+    <h1>Dein Schultag</h1>
+    <p class="muted">Ein Plan, ein aktueller Stand, eine Vorbereitung pro Stunde.</p>
+  </div>
+  <span class="time-chip"><span class="live-dot"></span>{{ now.strftime('%H:%M') }}</span>
+</header>
+
+{% if alert %}<div class="alert warning">Die letzte Vorbereitung ist fehlgeschlagen. Bereits fertige Briefings bleiben sicher verfügbar.</div>{% endif %}
+
+{% if provider == 'plugin' %}
+<section class="connection-nudge">
+  <span class="connection-nudge-icon">✦</span>
+  <div><strong>Direkte Vorbereitung einschalten</strong><span>Verbinde einmal dein ChatGPT-Abo. Danach entsteht jedes Briefing hier in ClassBrief.</span></div>
+  <a class="button primary compact" href="/settings/integrations#chatgpt-plan">Verbinden</a>
+</section>
+{% endif %}
+
+<section class="day-plan">
+  <div class="section-title day-plan-head">
+    <div><p class="label">HEUTE</p><h2>{{ lesson_rows|length }} {{ 'Stunde' if lesson_rows|length == 1 else 'Stunden' }}</h2></div>
+    <a href="/schedule">Ganze Woche</a>
+  </div>
+  {% if lesson_rows %}
+  <div class="lesson-agenda">
+    {% for row in lesson_rows %}
+    <article class="agenda-row state-{{ row.state }} {% if next_lesson and row.lesson.id == next_lesson.id %}is-next{% endif %}">
+      <div class="agenda-time"><strong>{{ row.start.strftime('%H:%M') }}</strong><span>{{ row.end.strftime('%H:%M') }}</span></div>
+      <span class="agenda-track"><i class="bg-{{ row.lesson.subject.color_identifier }}"></i></span>
+      <div class="agenda-main">
+        <div class="agenda-title">
+          <span class="subject-icon bg-{{ row.lesson.subject.color_identifier }}">{{ row.lesson.subject.short_name[:2] }}</span>
+          <div><h3>{{ row.lesson.subject.name }}</h3><p>{% if row.lesson.room %}Raum {{ row.lesson.room }}{% endif %}{% if row.lesson.teacher %} · {{ row.lesson.teacher }}{% endif %}{% if not row.lesson.room and not row.lesson.teacher %}Regulärer Unterricht{% endif %}</p></div>
+        </div>
+        {% if row.lesson.change_kind and row.lesson.change_kind != 'normal' %}<span class="schedule-change">Planänderung{% if row.lesson.note %}: {{ row.lesson.note }}{% endif %}</span>{% endif %}
+        {% if row.briefing %}<p class="agenda-topic">{{ row.briefing.probable_topic }}</p>{% endif %}
+      </div>
+      <div class="agenda-action">
+        {% if row.state == 'live' %}<span class="status-chip live">Läuft</span>
+        {% elif row.state == 'past' %}<span class="status-chip muted">Vorbei</span>
+        {% elif next_lesson and row.lesson.id == next_lesson.id %}<span class="status-chip next">Als Nächstes</span>
+        {% endif %}
+        {% if row.briefing %}
+          <a class="button secondary compact" href="/briefings/{{ row.briefing.id }}">Briefing öffnen</a>
+        {% elif not row.lesson.subject.briefing_enabled %}
+          <span class="no-briefing">Keine Vorbereitung nötig</span>
+        {% elif row.state == 'past' %}
+          <span class="no-briefing">Nicht vorbereitet</span>
+        {% elif provider == 'chatgpt_plan' or provider == 'openai' %}
+          <button class="button primary compact prepare-button" data-lesson="{{ row.lesson.id }}" data-subject="{{ row.lesson.subject.id }}">Jetzt vorbereiten</button>
+        {% else %}
+          <a class="button secondary compact" href="/settings/integrations#chatgpt-plan">ChatGPT verbinden</a>
+        {% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="day-off">
+    <span>☀</span><div><h2>Heute ist nichts geplant.</h2><p>Der nächste Schultag erscheint automatisch aus deinem zentralen Stundenplan.</p></div>
+  </div>
+  {% endif %}
+</section>
+
+{% if recent_briefings %}
+<section class="section-block compact-history">
+  <div class="section-title"><div><p class="label">RÜCKBLICK</p><h2>Zuletzt vorbereitet</h2></div><a href="/briefings">Alle Briefings</a></div>
+  <div class="recent-briefings">
+    {% for item in recent_briefings[:3] %}
+    <a class="recent-briefing" href="/briefings/{{ item.id }}">
+      <span class="subject-icon bg-{{ item.subject.color_identifier }}">{{ item.subject.short_name[:2] }}</span>
+      <div class="grow"><strong>{{ item.probable_topic }}</strong><span>{{ item.subject.name }} · {{ item.lesson.scheduled_start.strftime('%d.%m. · %H:%M') }}</span></div>
+      {{ icon('chevron')|safe }}
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% endblock %}

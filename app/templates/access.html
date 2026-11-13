@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07131f"><meta name="referrer" content="no-referrer">
+  <link rel="icon" href="/static/icons/icon.svg"><link rel="stylesheet" href="/static/app.css?v=5">
+  <title>Sicherer Zugang · ClassBrief</title>
+</head>
+<body class="login-body">
+  <main class="login-card">
+    <div class="brand login-brand"><span class="brand-mark">C<span>B</span></span><span>ClassBrief</span></div>
+    <div>
+      <p class="eyebrow">SICHERER EINMAL-LINK</p>
+      <h1>Dein Passwort festlegen.</h1>
+      <p class="muted">Wähle dein persönliches ClassBrief-Passwort. Es wird ausschließlich als sicherer Prüfwert auf deinem Server gespeichert.</p>
+    </div>
+    {% if error %}<div class="alert danger">{{ error }}</div>{% endif %}
+    {% if token %}
+    <form method="post" action="/access" class="form-stack" autocomplete="off">
+      <input type="hidden" name="token" value="{{ token }}">
+      <label>Neues Passwort<input name="password" type="password" minlength="12" maxlength="200" autocomplete="new-password" autofocus required><small>Mindestens 12 Zeichen – eine längere Passphrase ist ideal.</small></label>
+      <label>Passwort wiederholen<input name="password_confirm" type="password" minlength="12" maxlength="200" autocomplete="new-password" required></label>
+      <button class="button primary wide" type="submit">Passwort speichern und anmelden <span aria-hidden="true">→</span></button>
+    </form>
+    {% else %}
+    <p><a class="button secondary wide" href="/login">Zur Anmeldung</a></p>
+    {% endif %}
+    <p class="login-foot">Der Link funktioniert nur einmal und läuft automatisch ab.</p>
+  </main>
+</body>
+</html>

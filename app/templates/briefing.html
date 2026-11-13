@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% from "_brief_blocks.html" import render_blocks %}
+{% block title %}{{ briefing.subject.name }} · ClassBrief{% endblock %}
+{% block content %}
+<header class="detail-header">
+  <a class="back-link" href="/">{{ icon('back')|safe }} Heute</a>
+  <div class="briefing-kicker"><span class="subject-icon bg-{{ briefing.subject.color_identifier }}">{{ briefing.subject.short_name[:2] }}</span><div><p class="eyebrow">{{ briefing.lesson.scheduled_start.strftime('%d. %B · %H:%M')|month_de }}{% if briefing.lesson.room %} · Raum {{ briefing.lesson.room }}{% endif %}</p><h1>{{ briefing.subject.name }}</h1>{% if briefing.lesson.status == 'changed' %}<span class="schedule-change">Aktueller Vertretungsplan{% if briefing.lesson.teacher %} · {{ briefing.lesson.teacher }}{% endif %}</span>{% endif %}</div></div>
+  <span class="ready-badge">{{ icon('check')|safe }} Fertig</span>
+</header>
+
+<section class="topic-panel">
+  <p class="label">{{ 'WAHRSCHEINLICHES THEMA' if has_new_material else 'BESTÄTIGTER ANSCHLUSS' }}</p>
+  <h2>{{ briefing.probable_topic }}</h2>
+  {% if not has_new_material and not is_empty %}<p class="confidence-note">Keine neuen relevanten Dateien – diese Vorbereitung baut auf dem zuletzt bestätigten Unterrichtsstand auf.</p>{% endif %}
+  {% if briefing.confidence == 'lower' %}<p class="confidence-note">Geringere Sicherheit: Es war keine vorherige Fachstunde gespeichert.</p>{% endif %}
+</section>
+
+<div class="tabs" role="tablist" aria-label="Briefing-Länge">
+  <button role="tab" class="active" aria-selected="true" data-tab="quick">30 Sekunden</button>
+  <button role="tab" aria-selected="false" data-tab="medium">2 Minuten</button>
+  <button role="tab" aria-selected="false" data-tab="deep">Details</button>
+</div>
+
+<section class="brief-content tab-panel active" id="quick" role="tabpanel">
+  {% if deep.presentation and deep.presentation.quick %}{{ render_blocks(deep.presentation.quick) }}{% else %}{{ render_blocks(legacy_brief_blocks(briefing.quick_brief)) }}{% endif %}
+</section>
+<section class="brief-content tab-panel" id="medium" role="tabpanel" hidden>
+  {% if deep.presentation and deep.presentation.medium %}{{ render_blocks(deep.presentation.medium) }}{% else %}{{ render_blocks(legacy_brief_blocks(briefing.medium_brief)) }}{% endif %}
+</section>
+<section class="brief-content tab-panel" id="deep" role="tabpanel" hidden>
+  {% if deep.presentation and deep.presentation.deep %}{{ render_blocks(deep.presentation.deep) }}{% else %}
+    {{ render_blocks(legacy_brief_blocks(deep.summary)) }}
+    {% if deep.prior_knowledge %}<h3>Das solltest du mitbringen</h3><ul class="check-list">{% for point in deep.prior_knowledge %}<li>{{ point }}</li>{% endfor %}</ul>{% endif %}
+    {% if deep.important_terms %}<h3>Zentrale Begriffe</h3><dl class="term-list">{% for term in deep.important_terms %}<div><dt>{{ term.term }}</dt><dd>{{ term.explanation }}</dd></div>{% endfor %}</dl>{% endif %}
+    {% if deep.likely_tasks %}<h3>Mögliche Aufgaben</h3><ul>{% for task in deep.likely_tasks %}<li>{{ task }}</li>{% endfor %}</ul>{% endif %}
+    {% if deep.pitfalls %}<h3>Verständnisfallen</h3><ul>{% for pitfall in deep.pitfalls %}<li>{{ pitfall }}</li>{% endfor %}</ul>{% endif %}
+  {% endif %}
+  {% if deep.connections %}<section class="connection-card"><p class="label">ANSCHLUSS AN DIE LETZTEN STUNDEN</p><ul>{% for item in deep.connections %}<li>{{ item }}</li>{% endfor %}</ul></section>{% endif %}
+  {% if deep.answer_cards %}<section class="answer-section"><div class="section-title"><div><h3>Wenn eine Frage kommt</h3><p>Kurze Antworten, die du direkt sagen kannst.</p></div></div><div class="answer-grid">{% for card in deep.answer_cards %}<article class="answer-card certainty-{{ card.certainty }}"><div class="answer-card-head"><span>FRAGE {{ loop.index }}</span><span>{{ {'confirmed':'Belegt','likely':'Wahrscheinlich','uncertain':'Unsicher'}[card.certainty] }}</span></div><h4>{{ card.question }}</h4><p>{{ card.answer }}</p>{% if card.evidence %}<div class="evidence">{% for point in card.evidence %}<span>{{ point }}</span>{% endfor %}</div>{% endif %}</article>{% endfor %}</div></section>{% endif %}
+</section>
+
+{% if deep.sources %}<section class="sources"><p class="label">QUELLEN</p>{% for source in deep.sources %}<div class="source-row">{{ icon('file')|safe }}<div><strong>{{ source.file }}</strong><span>{% if source.pages %}Seiten {{ source.pages|join(', ') }}{% else %}Dokument{% endif %}</span></div></div>{% endfor %}</section>{% endif %}
+
+<section class="feedback" id="feedback">
+  {% if briefing.feedback %}<p><strong>Danke.</strong> Deine Rückmeldung wurde gespeichert.</p>
+  {% else %}<div><strong>Kam es ungefähr so dran?</strong><span>Hilft, das Fachgedächtnis sauber zu halten.</span></div><form method="post" action="/briefings/{{ briefing.id }}/feedback"><div class="feedback-buttons"><button name="feedback" value="yes">Ja</button><button type="button" id="partial-toggle">Teilweise</button><button name="feedback" value="no">Nein</button></div><div class="partial-note" hidden><label>Was wurde tatsächlich behandelt?<textarea name="note" rows="3"></textarea></label><button name="feedback" value="partial">Speichern</button></div></form>{% endif %}
+</section>
+
+<form class="briefing-delete" method="post" action="/briefings/{{ briefing.id }}/delete">
+  <button class="text-danger" data-confirm="Dieses Briefing wirklich löschen? Verwendete Materialien werden wieder für eine neue Vorbereitung freigegeben.">{{ 'Leeres Briefing löschen' if is_empty else 'Briefing löschen' }}</button>
+</form>
+{% endblock %}

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Verbindungen · ClassBrief{% endblock %}
+{% block content %}
+<header class="page-header clean-head"><div><p class="eyebrow">EINSTELLUNGEN</p><h1>Verbindungen</h1><p class="muted">Einmal verbinden, danach arbeitet ClassBrief selbstständig in der Cloud.</p></div></header>
+{% include "settings/_nav.html" %}
+
+<section class="plan-connection {% if chatgpt_connection %}is-connected{% endif %}" id="chatgpt-plan">
+  <div class="plan-connection-head">
+    <span class="openai-mark">✦</span>
+    <div class="grow"><p class="label">CHATGPT-ABO</p><h2>{% if chatgpt_connection %}Direkte Vorbereitung ist aktiv{% else %}ChatGPT direkt mit ClassBrief verbinden{% endif %}</h2><p>{% if chatgpt_connection %}Briefings entstehen innerhalb von ClassBrief – ohne API-Schlüssel und ohne separaten Geldzähler.{% else %}Nutze dein vorhandenes Plus- oder Pro-Abo für „Jetzt vorbereiten“, ohne die App zu verlassen.{% endif %}</p></div>
+    {% if chatgpt_connection %}<span class="connected-seal">✓ Verbunden</span>{% endif %}
+  </div>
+
+  {% if chatgpt_connection %}
+  <div class="connected-account">
+    <div><span>Aktives Konto</span><strong>{{ chatgpt_connection.email }}</strong></div>
+    <div><span>Nutzung</span><strong>Im ChatGPT-Abo enthalten</strong></div>
+    <a href="https://chatgpt.com/#settings/usage" target="_blank" rel="noopener">Nutzung verwalten ↗</a>
+  </div>
+  <form method="post" action="/settings/integrations/chatgpt/disconnect" class="connection-footer">
+    <span>ClassBrief hat keinen Zugriff auf deine Chats oder dein Passwort.</span>
+    <button class="text-danger" data-confirm="ChatGPT wirklich von ClassBrief trennen?">Verbindung trennen</button>
+  </form>
+  {% elif pairing_command %}
+  <div class="pairing-wizard">
+    <div class="pairing-step"><span>1</span><div><strong>Hilfsdatei laden</strong><p>Sie öffnet einmalig die offizielle OpenAI-Anmeldung auf deinem Mac.</p><a class="button secondary compact" href="/settings/integrations/chatgpt/helper">Hilfsdatei herunterladen</a></div></div>
+    <div class="pairing-step"><span>2</span><div><strong>Befehl im Terminal ausführen</strong><p>Der Kopplungscode ist nur 15 Minuten und genau einmal gültig.</p><div class="command-box"><code>{{ pairing_command }}</code><button type="button" class="copy-value" data-copy="{{ pairing_command }}">Kopieren</button></div></div></div>
+    <div class="pairing-step"><span>3</span><div><strong>OpenAI-Freigabe bestätigen</strong><p>Danach diese Seite neu laden. Dein Computer muss anschließend nicht mehr eingeschaltet sein.</p><a class="button primary compact" href="/settings/integrations#chatgpt-plan">Verbindung prüfen</a></div></div>
+  </div>
+  {% else %}
+  <div class="plan-benefits"><span>✓ Kein API-Schlüssel</span><span>✓ Bleibt in ClassBrief</span><span>✓ Funktioniert bei ausgeschaltetem PC</span></div>
+  <form method="post" action="/settings/integrations/chatgpt/pair"><button class="button primary">Einmalig mit ChatGPT verbinden</button></form>
+  <p class="connection-fineprint">Die erstmalige Freigabe erfolgt aus Sicherheitsgründen kurz über die offizielle OpenAI-Anmeldung. Zugangsdaten werden verschlüsselt auf dem ClassBrief-Server gespeichert.</p>
+  {% endif %}
+</section>
+
+<section class="settings-panel connection-overview">
+  <div class="section-title"><div><p class="label">DATENQUELLEN</p><h2>Was ClassBrief zusammenführt</h2></div></div>
+  <div class="integration-list clean-integrations">
+    <div><span class="integration-icon">IS</span><div><strong>IServ WebDAV</strong><span>Aktuelle Unterrichtsmaterialien</span></div><b class="{{ 'status-good' if statuses.iserv else 'status-muted' }}">{{ 'Verbunden' if statuses.iserv else 'Nicht eingerichtet' }}</b></div>
+    <div><span class="integration-icon">U</span><div><strong>Pebbule · WebUntis</strong><span>Stunden, Räume, Ausfälle und Vertretungen</span></div><b class="{{ 'status-good' if statuses.pebbule else 'status-muted' }}">{{ 'Aktueller Live-Plan' if statuses.pebbule else 'Basisplan aktiv' }}</b></div>
+    <div><span class="integration-icon">CB</span><div><strong>ClassBrief-Plugin</strong><span>Optionale Alternative für Briefings im normalen Chat</span></div><b class="status-good">Bereit</b></div>
+    <div><span class="integration-icon">P</span><div><strong>Benachrichtigungen</strong><span>Hinweis, sobald eine Vorbereitung fertig ist</span></div>{% if statuses.push %}<button class="button secondary compact" id="enable-push">Aktivieren</button>{% else %}<b class="status-muted">Optional</b>{% endif %}</div>
+  </div>
+</section>
+{% endblock %}

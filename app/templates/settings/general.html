@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Einstellungen · ClassBrief{% endblock %}
+{% block content %}
+<header class="page-header"><div><p class="eyebrow">CLASSBRIEF</p><h1>Einstellungen</h1></div></header>
+{% include "settings/_nav.html" %}
+<section class="settings-panel"><h2>Allgemein</h2><p class="muted">ClassBrief nutzt die Zeitzone Europe/Berlin. Briefings werden standardmäßig 20 Minuten vor einer Stunde erzeugt; pro Fach kannst du das anpassen.</p><div class="setting-row"><div><strong>Als App installieren</strong><span>Schneller Start vom Home-Bildschirm, ohne Browserleisten</span></div><button class="button secondary" id="install-app">Installieren</button></div><div class="install-help" id="install-help" hidden>Auf iPhone/iPad: Teilen → „Zum Home-Bildschirm“. In anderen Browsern erscheint die Installation im Browsermenü.</div><div class="setting-row"><div><strong>Darstellung</strong><span>Automatisch passend zu deinem Gerät</span></div><span class="pill">System</span></div><div class="setting-row"><div><strong>Datensparsamkeit</strong><span>Originaldateien werden nach der Verarbeitung gelöscht</span></div><span class="status-good">Aktiv</span></div><form method="post" action="/logout"><button class="button secondary" type="submit">Abmelden</button></form></section>
+{% endblock %}
